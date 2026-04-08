@@ -48,16 +48,6 @@ management:
     tags:
       application: ${spring.application.name}
 
-
-eureka:
-  instance:
-    preferIpAddress: true
-  client:
-    fetchRegistry: true
-    registerWithEureka: true
-    serviceUrl:
-      defaultZone: http://localhost:8070/eureka/
-
 info:
   app:
     name: "loans"
