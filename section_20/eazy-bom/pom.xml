@@ -17,14 +17,12 @@
     </licenses>
     <developers>
         <developer>
-            <name>Madan Reddy</name>
-            <email>tutor@eazybytes.com</email>
-            <organization>eazybtes</organization>
-            <organizationUrl>www.eazybytes.com</organizationUrl>
+            <name>Luong Nguyen</name>
+            <email>luongnm93@live.com</email>
         </developer>
     </developers>
     <scm>
-        <url>https://github.com/luongnm93/microservices</url>
+        <url>https://github.com/nmluong93/spring-boot-microservice-with-spring-cloud.git</url>
     </scm>
     <properties>
         <common-lib.version>1.0.0</common-lib.version>
