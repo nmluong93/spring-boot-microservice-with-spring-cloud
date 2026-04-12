@@ -15,11 +15,17 @@ import com.eazybytes.accounts.service.ICustomersService;
 import com.eazybytes.accounts.service.client.CardsFeignClient;
 import com.eazybytes.accounts.service.client.LoansFeignClient;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @Service
 @AllArgsConstructor
+@Slf4j
 public class CustomersServiceImpl implements ICustomersService {
 
     private AccountsRepository accountsRepository;
@@ -28,8 +34,8 @@ public class CustomersServiceImpl implements ICustomersService {
     private LoansFeignClient loansFeignClient;
 
     /**
-     * @param mobileNumber - Input Mobile Number
-     *  @param correlationId - Correlation ID value generated at Edge server
+     * @param mobileNumber  - Input Mobile Number
+     * @param correlationId - Correlation ID value generated at Edge server
      * @return Customer Details based on a given mobileNumber
      */
     @Override
@@ -44,13 +50,30 @@ public class CustomersServiceImpl implements ICustomersService {
         CustomerDetailsDto customerDetailsDto = CustomerMapper.mapToCustomerDetailsDto(customer, new CustomerDetailsDto());
         customerDetailsDto.setAccountsDto(AccountsMapper.mapToAccountsDto(accounts, new AccountsDto()));
 
-        ResponseEntity<LoansDto> loansDtoResponseEntity = loansFeignClient.fetchLoanDetails(correlationId, mobileNumber);
-        customerDetailsDto.setLoansDto(loansDtoResponseEntity.getBody());
-
-        ResponseEntity<CardsDto> cardsDtoResponseEntity = cardsFeignClient.fetchCardDetails(correlationId, mobileNumber);
-        customerDetailsDto.setCardsDto(cardsDtoResponseEntity.getBody());
+        fetchApiAsync(mobileNumber, correlationId, customerDetailsDto);
 
         return customerDetailsDto;
 
+    }
+
+    private void fetchApiAsync(String mobileNumber, String correlationId, CustomerDetailsDto customerDetailsDto) {
+        final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
+        var completableFutureCardRs = CompletableFuture
+                .supplyAsync(() -> cardsFeignClient.fetchCardDetails(correlationId, mobileNumber), virtualThreadExecutor)
+                .exceptionally(exp -> {
+                    log.error("Error fetching card details {}", exp.getMessage());
+                    return null;
+                }).thenAccept(cardDetails -> {
+                    customerDetailsDto.setCardsDto(cardDetails == null ? null : cardDetails.getBody());
+                });
+        var completableFutureLoanRs = CompletableFuture.supplyAsync(() -> loansFeignClient.fetchLoanDetails(correlationId, mobileNumber), virtualThreadExecutor)
+                .exceptionally(exp -> {
+                    log.error("Error fetching loan details {}", exp.getMessage());
+                    return null;
+                }).thenAccept(loanDetails -> {
+                    customerDetailsDto.setLoansDto(loanDetails == null ? null : loanDetails.getBody());
+                });
+        CompletableFuture.allOf(completableFutureLoanRs, completableFutureCardRs).join();
+        virtualThreadExecutor.shutdown();
     }
 }
